@@ -1,4 +1,4 @@
-export default function MessageList({ messages }) {
+export default function MessageList({ messages, apiUrl }) {
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.length === 0 && (
@@ -18,6 +18,21 @@ export default function MessageList({ messages }) {
             }`}
           >
             {m.content}
+            {Array.isArray(m.attachments) && m.attachments.length > 0 && (
+              <div className={`mt-2 flex flex-wrap gap-2 ${m.role === 'user' ? 'text-white/90' : 'text-gray-700'}`}>
+                {m.attachments.map((attId) => (
+                  <a
+                    key={attId}
+                    href={`${apiUrl}/attachments/${attId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs border ${m.role === 'user' ? 'border-white/30 hover:bg-white/10' : 'border-gray-300 hover:bg-white'}`}
+                  >
+                    Attachment
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ))}

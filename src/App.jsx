@@ -35,46 +35,49 @@ export default function App() {
     }
   }
 
-  const startNewChat = async () => {
-    try {
-      const res = await fetch(`${API_URL}/conversations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'New Chat' }),
-      })
-      const data = await res.json()
-      setConversations((prev) => [{ id: data.id, title: data.title }, ...prev])
-      setCurrentId(data.id)
-      setMessages([])
-    } catch (e) {
-      console.error(e)
-    }
+  const ensureConversation = async () => {
+    if (currentId) return currentId
+    // Create a lightweight conversation immediately
+    const res = await fetch(`${API_URL}/conversations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Chat' }),
+    })
+    const data = await res.json()
+    setConversations((prev) => [{ id: data.id, title: data.title }, ...prev])
+    setCurrentId(data.id)
+    setMessages([])
+    return data.id
   }
 
-  const sendMessage = async (text) => {
+  const startNewChat = async () => {
+    await ensureConversation()
+  }
+
+  const sendMessage = async (text, attachmentIds = []) => {
     setLoading(true)
     try {
-      const optimisticUser = { id: `u-${Date.now()}`, conversation_id: currentId || 'new', role: 'user', content: text }
+      const convId = await ensureConversation()
+
+      const optimisticUser = { id: `u-${Date.now()}`,
+        conversation_id: convId,
+        role: 'user',
+        content: text || (attachmentIds.length ? '(sent attachments)' : ''),
+        attachments: attachmentIds }
       setMessages((prev) => [...prev, optimisticUser])
 
       const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversation_id: currentId }),
+        body: JSON.stringify({ message: text || '', conversation_id: convId, attachments: attachmentIds }),
       })
       const data = await res.json()
-
-      // If a new conversation was created, update state
-      if (!currentId && data.conversation_id) {
-        setCurrentId(data.conversation_id)
-        // ensure it appears in the list
-        setConversations((prev) => [{ id: data.conversation_id, title: text.slice(0, 40) || 'New Chat' }, ...prev])
-      }
 
       const assistant = data.reply
       setMessages((prev) => prev.map(m => m.id === optimisticUser.id ? { ...m, id: `${Date.now()}` } : m).concat(assistant))
     } catch (e) {
       console.error(e)
+      alert('Failed to send message')
     } finally {
       setLoading(false)
     }
@@ -114,8 +117,8 @@ export default function App() {
               <div className="text-xs text-gray-500">{hasConversation ? 'Conversation' : 'No conversation selected'}</div>
             </div>
 
-            <MessageList messages={messages} />
-            <ChatInput onSend={sendMessage} disabled={loading} />
+            <MessageList messages={messages} apiUrl={API_URL} />
+            <ChatInput onSend={sendMessage} disabled={loading} apiUrl={API_URL} conversationId={currentId} ensureConversation={ensureConversation} />
           </main>
         </div>
       </div>
