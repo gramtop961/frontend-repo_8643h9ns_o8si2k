@@ -15,24 +15,27 @@ export default function MessageList({ messages }) {
         </div>
       )}
       {messages.map((m) => (
-        <div key={m.id} className="flex gap-3">
-          <div
-            className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-              m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'
-            }`}
-          >
-            {m.role === 'user' ? 'U' : 'AI'}
-          </div>
-          <div className="max-w-3xl">
-            <div className="whitespace-pre-wrap text-sm text-zinc-800 leading-relaxed">{m.content}</div>
+        <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
+          {m.role !== 'user' && (
+            <div className="h-8 w-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-semibold select-none">AI</div>
+          )}
+          <div className={`max-w-3xl rounded-2xl px-4 py-3 shadow-sm border text-sm leading-relaxed whitespace-pre-wrap ${
+            m.role === 'user'
+              ? 'bg-white border-zinc-200 text-zinc-900 rounded-br-sm'
+              : 'bg-zinc-100 border-zinc-200 text-zinc-900 rounded-bl-sm'
+          }`}>
+            {m.content}
             {m.attachments && m.attachments.length > 0 && (
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {m.attachments.map((a) => (
-                  <AttachmentPreview key={a.id} attachment={a} />
-                ))}
+                  <AttachmentPreview key={a.id} attachment={a} />)
+                )}
               </div>
             )}
           </div>
+          {m.role === 'user' && (
+            <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold select-none">U</div>
+          )}
         </div>
       ))}
       <div ref={endRef} />

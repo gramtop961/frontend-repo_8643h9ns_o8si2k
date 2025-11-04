@@ -48,16 +48,15 @@ function localAssistantReply(question) {
   );
 }
 
-async function tryBackendChat(message, attachments = []) {
+async function tryBackendChat(message, attachmentsMeta = []) {
   if (!BACKEND_URL) throw new Error('No backend configured');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    // Send JSON; backend can adapt. Files are not uploaded here yet; we pass names only.
     const resp = await fetch(`${BACKEND_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, attachments: attachments.map((f) => ({ name: f.name, type: f.type, size: f.size })) }),
+      body: JSON.stringify({ message, attachments: attachmentsMeta }),
       signal: controller.signal,
     });
     if (!resp.ok) throw new Error('Backend error');
@@ -66,6 +65,20 @@ async function tryBackendChat(message, attachments = []) {
     throw new Error('Invalid backend response');
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function uploadFileToBackend(file) {
+  if (!BACKEND_URL) return null;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const resp = await fetch(`${BACKEND_URL}/attachments`, { method: 'POST', body: fd });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return { id: data.id, name: data.filename, url: `${BACKEND_URL}${data.download_url}`, type: data.content_type };
+  } catch {
+    return null;
   }
 }
 
@@ -100,15 +113,29 @@ export default function App() {
   }, [messages, storageKey]);
 
   const handleSend = async (text, files) => {
-    const attachments = (files || []).map((f) => ({ id: crypto.randomUUID(), name: f.name, url: URL.createObjectURL(f), type: f.type }));
+    // First, try to upload files to backend to get durable URLs; fallback to local blob URLs
+    let uploaded = [];
+    if (files && files.length > 0 && BACKEND_URL) {
+      uploaded = await Promise.all(files.map(async (f) => {
+        const up = await uploadFileToBackend(f);
+        if (up) return up;
+        return { id: crypto.randomUUID(), name: f.name, url: URL.createObjectURL(f), type: f.type };
+      }));
+    }
+
+    const localOnly = (files || []).map((f) => ({ id: crypto.randomUUID(), name: f.name, url: URL.createObjectURL(f), type: f.type }));
+    const attachments = uploaded.length > 0 ? uploaded : localOnly;
 
     const userMsg = { id: crypto.randomUUID(), role: 'user', content: text, attachments };
     setMessages((prev) => [...prev, userMsg]);
 
+    // Prepare attachment metadata for backend
+    const attachmentsMeta = attachments.map((a) => ({ name: a.name, type: a.type, size: 0, url: a.url }));
+
     // Try backend first; if unavailable, fallback to local assistant
     let replyText = '';
     try {
-      replyText = await tryBackendChat(text, files);
+      replyText = await tryBackendChat(text, attachmentsMeta);
     } catch {
       replyText = localAssistantReply(text || '');
     }
