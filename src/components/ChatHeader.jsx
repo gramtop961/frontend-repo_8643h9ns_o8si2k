@@ -8,7 +8,7 @@ export default function ChatHeader() {
           <Sparkles size={18} />
         </div>
         <div>
-          <h1 className="text-sm sm:text-base font-semibold text-gray-800">ChatGPT Clone</h1>
+          <h1 className="text-sm sm:text-base font-semibold text-gray-800">StudyCenter Ai</h1>
           <p className="text-xs text-gray-500">Unlimited, always-on assistant</p>
         </div>
       </div>
