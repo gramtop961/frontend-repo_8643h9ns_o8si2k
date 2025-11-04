@@ -1,33 +1,36 @@
-import { Plus, MessageSquare } from 'lucide-react'
+import React from 'react';
 
-export default function ConversationList({ conversations, currentId, onNew, onSelect }) {
+export default function ConversationList({ conversations, activeId, onNewChat, onSelect }) {
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-gray-200">
+    <aside className="w-full md:w-64 border-r border-zinc-200 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      <div className="p-4 flex items-center justify-between">
+        <h2 className="text-sm font-medium text-zinc-700">Conversations</h2>
         <button
-          onClick={onNew}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 text-white py-2 text-sm hover:bg-black"
+          onClick={onNewChat}
+          className="text-xs px-2 py-1 rounded-md bg-zinc-900 text-white hover:bg-zinc-800"
         >
-          <Plus size={16} /> New Chat
+          New Chat
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto space-y-1 p-2">
+      <ul className="px-2 pb-2 space-y-1 overflow-auto max-h-[calc(100vh-4rem)]">
         {conversations.length === 0 && (
-          <div className="text-xs text-gray-500 p-3">No conversations yet</div>
+          <li className="text-xs text-zinc-500 px-2 py-6 text-center">No conversations yet</li>
         )}
         {conversations.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => onSelect(c.id)}
-            className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-md hover:bg-gray-100 ${
-              currentId === c.id ? 'bg-gray-100' : ''
-            }`}
-          >
-            <MessageSquare size={16} className="text-gray-500" />
-            <span className="truncate text-sm text-gray-800">{c.title || 'Chat'}</span>
-          </button>
+          <li key={c.id}>
+            <button
+              onClick={() => onSelect(c.id)}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-zinc-100 ${
+                c.id === activeId ? 'bg-zinc-900 text-white hover:bg-zinc-900' : 'text-zinc-800'
+              }`}
+              title={c.title}
+            >
+              <div className="truncate">{c.title}</div>
+              <div className={`text-xs truncate ${c.id === activeId ? 'text-zinc-300' : 'text-zinc-500'}`}>{c.preview}</div>
+            </button>
+          </li>
         ))}
-      </div>
-    </div>
-  )
+      </ul>
+    </aside>
+  );
 }

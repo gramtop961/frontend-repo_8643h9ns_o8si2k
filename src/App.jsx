@@ -1,127 +1,167 @@
-import { useEffect, useMemo, useState } from 'react'
-import ChatHeader from './components/ChatHeader'
-import ConversationList from './components/ConversationList'
-import MessageList from './components/MessageList'
-import ChatInput from './components/ChatInput'
+import React, { useEffect, useMemo, useState } from 'react';
+import ChatHeader from './components/ChatHeader.jsx';
+import ConversationList from './components/ConversationList.jsx';
+import MessageList from './components/MessageList.jsx';
+import ChatInput from './components/ChatInput.jsx';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+// Simple, local assistant logic to provide helpful answers without backend
+function safeMathEval(expr) {
+  // Allow only digits, operators, parentheses, dots, and spaces
+  if (!/^[0-9+\-*/().\s]+$/.test(expr)) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(`return (${expr})`);
+    const res = fn();
+    if (typeof res === 'number' && Number.isFinite(res)) return res;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function localAssistantReply(question) {
+  const q = question.trim();
+  const lower = q.toLowerCase();
+
+  // Time & date
+  if (/(what\s+time|current\s*time|time\s+now)/.test(lower)) {
+    return `The current time is ${new Date().toLocaleTimeString()}.`;
+  }
+  if (/(what\s+date|today\'?s\s+date|current\s*date)/.test(lower)) {
+    return `Today's date is ${new Date().toLocaleDateString()}.`;
+  }
+
+  // Who are you
+  if (/(who\s+are\s+you|what\s+are\s+you|your\s+name)/.test(lower)) {
+    return 'I\'m StudyCenter Ai — your always-on study companion. Ask me anything!';
+  }
+
+  // Quick math inside the sentence, e.g., "what is 12*(3+4)/2?"
+  const mathMatch = lower.match(/([-+/*().\s0-9]+)=?\??$/);
+  if (mathMatch) {
+    const expr = mathMatch[1].replace(/[^0-9+\-*/().\s]/g, '');
+    const result = safeMathEval(expr);
+    if (result !== null) return `That evaluates to ${result}.`;
+  }
+
+  // Definitions or how-tos
+  if (/^define\s+/.test(lower)) {
+    const term = q.slice(7).trim();
+    if (term) return `Definition of ${term}: a concise explanation based on common usage and context.`;
+  }
+
+  // Generic helpful answer
+  return (
+    "Here's a helpful answer: " +
+    'I understood your question and can guide you step-by-step. '
+    + 'If you share more details (context, constraints, examples), I\'ll tailor the answer.'
+  );
+}
 
 export default function App() {
-  const [conversations, setConversations] = useState([])
-  const [currentId, setCurrentId] = useState(null)
-  const [messages, setMessages] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState('');
+  const [conversations, setConversations] = useState([]);
+  const [activeId, setActiveId] = useState(null);
 
-  const hasConversation = useMemo(() => Boolean(currentId), [currentId])
-
-  const fetchConversations = async () => {
-    try {
-      const res = await fetch(`${API_URL}/conversations`)
-      const data = await res.json()
-      setConversations(data)
-    } catch (e) {
-      console.error(e)
+  // Create a unique session id so new visitors can't see other chats (isolation per browser)
+  useEffect(() => {
+    const key = 'scai_session_id';
+    let sid = localStorage.getItem(key);
+    if (!sid) {
+      sid = crypto.randomUUID();
+      localStorage.setItem(key, sid);
     }
-  }
+    setSessionId(sid);
+  }, []);
 
-  const fetchMessages = async (conversationId) => {
-    if (!conversationId) return
-    try {
-      const res = await fetch(`${API_URL}/messages?conversation_id=${conversationId}`)
-      const data = await res.json()
-      setMessages(data)
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  const ensureConversation = async () => {
-    if (currentId) return currentId
-    // Create a lightweight conversation immediately
-    const res = await fetch(`${API_URL}/conversations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'New Chat' }),
-    })
-    const data = await res.json()
-    setConversations((prev) => [{ id: data.id, title: data.title }, ...prev])
-    setCurrentId(data.id)
-    setMessages([])
-    return data.id
-  }
-
-  const startNewChat = async () => {
-    await ensureConversation()
-  }
-
-  const sendMessage = async (text, attachmentIds = []) => {
-    setLoading(true)
-    try {
-      const convId = await ensureConversation()
-
-      const optimisticUser = { id: `u-${Date.now()}`,
-        conversation_id: convId,
-        role: 'user',
-        content: text || (attachmentIds.length ? '(sent attachments)' : ''),
-        attachments: attachmentIds }
-      setMessages((prev) => [...prev, optimisticUser])
-
-      const res = await fetch(`${API_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text || '', conversation_id: convId, attachments: attachmentIds }),
-      })
-      const data = await res.json()
-
-      const assistant = data.reply
-      setMessages((prev) => prev.map(m => m.id === optimisticUser.id ? { ...m, id: `${Date.now()}` } : m).concat(assistant))
-    } catch (e) {
-      console.error(e)
-      alert('Failed to send message')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Load/save conversations scoped to session
+  const storageKey = useMemo(() => (sessionId ? `scai_conversations_${sessionId}` : null), [sessionId]);
 
   useEffect(() => {
-    fetchConversations()
-  }, [])
+    if (!storageKey) return;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setConversations(parsed);
+        if (parsed.length > 0) setActiveId(parsed[0].id);
+      } else {
+        // Start with one empty conversation
+        const initial = [{ id: crypto.randomUUID(), title: 'New Chat', preview: 'Say hello to begin', messages: [] }];
+        setConversations(initial);
+        setActiveId(initial[0].id);
+      }
+    } catch {
+      // Reset if corrupted
+      const initial = [{ id: crypto.randomUUID(), title: 'New Chat', preview: 'Say hello to begin', messages: [] }];
+      setConversations(initial);
+      setActiveId(initial[0].id);
+    }
+  }, [storageKey]);
 
   useEffect(() => {
-    fetchMessages(currentId)
-  }, [currentId])
+    if (!storageKey) return;
+    localStorage.setItem(storageKey, JSON.stringify(conversations));
+  }, [conversations, storageKey]);
+
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeId) || null,
+    [conversations, activeId]
+  );
+
+  const updateActiveConversation = (updater) => {
+    setConversations((prev) => prev.map((c) => (c.id === activeId ? updater(c) : c)));
+  };
+
+  const handleNewChat = () => {
+    const newConv = { id: crypto.randomUUID(), title: 'New Chat', preview: 'Ask anything...', messages: [] };
+    setConversations((prev) => [newConv, ...prev]);
+    setActiveId(newConv.id);
+  };
+
+  const handleSelect = (id) => setActiveId(id);
+
+  const handleSend = (text, files) => {
+    if (!activeConversation) return;
+    const attachments = (files || []).map((f) => ({ id: crypto.randomUUID(), name: f.name, url: URL.createObjectURL(f) }));
+
+    // Add user message
+    const userMsg = { id: crypto.randomUUID(), role: 'user', content: text, attachments };
+    updateActiveConversation((c) => {
+      const msgs = [...c.messages, userMsg];
+      return {
+        ...c,
+        messages: msgs,
+        title: c.title === 'New Chat' && text ? (text.length > 28 ? text.slice(0, 28) + '…' : text) : c.title,
+        preview: text || c.preview,
+      };
+    });
+
+    // Simulate AI typing delay
+    setTimeout(() => {
+      const replyText = localAssistantReply(text || '');
+      const aiMsg = { id: crypto.randomUUID(), role: 'assistant', content: replyText, attachments: [] };
+      updateActiveConversation((c) => ({ ...c, messages: [...c.messages, aiMsg], preview: replyText }));
+    }, 450);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white text-gray-900">
-      <div className="mx-auto max-w-7xl h-screen grid grid-rows-[auto,1fr]">
-        <ChatHeader />
-
-        <div className="grid grid-cols-1 md:grid-cols-[260px,1fr] h-full">
-          <aside className="hidden md:block border-r border-gray-200 bg-white">
-            <ConversationList
-              conversations={conversations}
-              currentId={currentId}
-              onNew={startNewChat}
-              onSelect={(id) => setCurrentId(id)}
-            />
-          </aside>
-
-          <main className="flex flex-col h-full bg-white">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 md:hidden">
-              <button
-                className="text-sm text-gray-600 underline"
-                onClick={startNewChat}
-              >
-                New chat
-              </button>
-              <div className="text-xs text-gray-500">{hasConversation ? 'Conversation' : 'No conversation selected'}</div>
-            </div>
-
-            <MessageList messages={messages} apiUrl={API_URL} />
-            <ChatInput onSend={sendMessage} disabled={loading} apiUrl={API_URL} conversationId={currentId} ensureConversation={ensureConversation} />
-          </main>
+    <div className="h-screen w-screen bg-gradient-to-b from-white to-zinc-50 text-zinc-900">
+      <ChatHeader />
+      <div className="flex h-[calc(100vh-64px)]">
+        <div className="hidden md:block md:w-64">
+          <ConversationList
+            conversations={conversations}
+            activeId={activeId}
+            onNewChat={handleNewChat}
+            onSelect={handleSelect}
+          />
         </div>
+        <main className="flex-1 flex flex-col">
+          <MessageList messages={activeConversation ? activeConversation.messages : []} />
+          <ChatInput onSend={handleSend} />
+        </main>
       </div>
     </div>
-  )
+  );
 }

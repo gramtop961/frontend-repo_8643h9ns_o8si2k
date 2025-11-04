@@ -1,35 +1,48 @@
-import AttachmentPreview from './AttachmentPreview'
+import React, { useEffect, useRef } from 'react';
 
-export default function MessageList({ messages, apiUrl }) {
+export default function MessageList({ messages }) {
+  const endRef = useRef(null);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-auto p-4 space-y-4">
       {messages.length === 0 && (
-        <div className="text-center text-gray-500 text-sm pt-16">
-          Start chatting — ask anything.
+        <div className="text-center text-zinc-500 text-sm pt-24">
+          Ask anything to get started. Attachments and previews supported.
         </div>
       )}
       {messages.map((m) => (
-        <div key={m.id}
-          className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-        >
+        <div key={m.id} className="flex gap-3">
           <div
-            className={`max-w-[85%] sm:max-w-[70%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
-              m.role === 'user'
-                ? 'bg-gray-900 text-white rounded-br-sm'
-                : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+            className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold ${
+              m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'
             }`}
           >
-            {m.content}
-            {Array.isArray(m.attachments) && m.attachments.length > 0 && (
-              <div className={`mt-2 grid gap-2 ${m.role === 'user' ? 'text-white/90' : 'text-gray-700'}`} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                {m.attachments.map((attId) => (
-                  <AttachmentPreview key={attId} id={attId} apiUrl={apiUrl} isUser={m.role === 'user'} />
+            {m.role === 'user' ? 'U' : 'AI'}
+          </div>
+          <div className="max-w-3xl">
+            <div className="whitespace-pre-wrap text-sm text-zinc-800 leading-relaxed">{m.content}</div>
+            {m.attachments && m.attachments.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {m.attachments.map((a) => (
+                  <a
+                    key={a.id}
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2 py-1 rounded border border-zinc-200 text-xs text-zinc-700 bg-white hover:bg-zinc-50"
+                  >
+                    {a.name}
+                  </a>
                 ))}
               </div>
             )}
           </div>
         </div>
       ))}
+      <div ref={endRef} />
     </div>
-  )
+  );
 }
