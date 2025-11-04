@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import AttachmentPreview from './AttachmentPreview.jsx';
 
 export default function MessageList({ messages }) {
   const endRef = useRef(null);
@@ -10,7 +11,7 @@ export default function MessageList({ messages }) {
     <div className="flex-1 overflow-auto p-4 space-y-4">
       {messages.length === 0 && (
         <div className="text-center text-zinc-500 text-sm pt-24">
-          Ask anything to get started. Attachments and previews supported.
+          Ask anything to get started. Drag and drop files for inline previews.
         </div>
       )}
       {messages.map((m) => (
@@ -27,15 +28,7 @@ export default function MessageList({ messages }) {
             {m.attachments && m.attachments.length > 0 && (
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {m.attachments.map((a) => (
-                  <a
-                    key={a.id}
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-2 py-1 rounded border border-zinc-200 text-xs text-zinc-700 bg-white hover:bg-zinc-50"
-                  >
-                    {a.name}
-                  </a>
+                  <AttachmentPreview key={a.id} attachment={a} />
                 ))}
               </div>
             )}

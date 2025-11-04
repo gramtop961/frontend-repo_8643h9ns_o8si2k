@@ -1,72 +1,38 @@
-import { useEffect, useState } from 'react'
+import React from 'react';
 
-export default function AttachmentPreview({ id, apiUrl, isUser }) {
-  const [kind, setKind] = useState('unknown') // 'image' | 'pdf' | 'unknown'
-  const [size, setSize] = useState(null)
-  const [error, setError] = useState(null)
+function isImage(type) {
+  return type?.startsWith('image/');
+}
 
-  const url = `${apiUrl}/attachments/${id}`
+function isPDF(type, name = '') {
+  return type === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
+}
 
-  useEffect(() => {
-    let cancelled = false
-    async function detect() {
-      try {
-        const res = await fetch(url, { method: 'HEAD' })
-        if (!res.ok) throw new Error('HEAD failed')
-        const ct = res.headers.get('content-type') || ''
-        const cl = res.headers.get('content-length')
-        if (cancelled) return
-        if (ct.startsWith('image/')) setKind('image')
-        else if (ct === 'application/pdf') setKind('pdf')
-        else setKind('unknown')
-        if (cl) setSize(Number(cl))
-      } catch (e) {
-        if (!cancelled) setError(e)
-      }
-    }
-    detect()
-    return () => { cancelled = true }
-  }, [url])
+export default function AttachmentPreview({ attachment }) {
+  // attachment can be { id, name, url, type }
+  const { name, url, type } = attachment;
 
-  const chipBase = isUser
-    ? 'border-white/30 hover:bg-white/10 text-white/90'
-    : 'border-gray-300 hover:bg-white text-gray-700'
-
-  if (kind === 'image') {
+  if (isImage(type)) {
     return (
-      <a href={url} target="_blank" rel="noreferrer" className="block group">
-        <img
-          src={url}
-          alt="attachment"
-          className={`rounded-lg border ${isUser ? 'border-white/20' : 'border-gray-200'} max-h-48 max-w-[18rem] object-contain bg-white`}
-          loading="lazy"
-        />
+      <a href={url} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-md border border-zinc-200">
+        <img src={url} alt={name} className="h-32 w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" />
+        <div className="px-2 py-1 text-[10px] text-zinc-600 truncate bg-white">{name}</div>
       </a>
-    )
+    );
   }
 
-  if (kind === 'pdf') {
+  if (isPDF(type, name)) {
     return (
-      <div className={`rounded-lg border ${isUser ? 'border-white/20' : 'border-gray-200'} bg-white overflow-hidden w-full max-w-[22rem]`}> 
-        <div className="h-48">
-          <iframe title="PDF preview" src={url} className="w-full h-full" />
-        </div>
-        <div className="flex items-center justify-between px-2 py-1 text-xs">
-          <span className="text-gray-600">PDF document</span>
-          <a href={url} target="_blank" rel="noreferrer" className="underline">Open</a>
-        </div>
-      </div>
-    )
+      <a href={url} target="_blank" rel="noreferrer" className="block rounded-md border border-zinc-200 bg-white overflow-hidden">
+        <div className="h-32 w-full bg-zinc-50 grid place-items-center text-xs text-zinc-600">PDF Preview</div>
+        <div className="px-2 py-1 text-[10px] text-zinc-600 truncate">{name}</div>
+      </a>
+    );
   }
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs border ${chipBase}`}
-    >
-      Attachment{size ? ` • ${(size/1024).toFixed(1)} KB` : ''}
+    <a href={url} target="_blank" rel="noreferrer" className="px-2 py-2 rounded-md border border-zinc-200 bg-white text-xs text-zinc-700 truncate">
+      {name}
     </a>
-  )
+  );
 }
